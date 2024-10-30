@@ -1,4 +1,5 @@
 import torch
+from torchvision import transforms
 import os
 from PIL import Image
 import torch.utils.data
@@ -6,9 +7,12 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 class RDDdataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = root_dir
+    def __init__(self, transform=None):
         self.transform = transform
+        if self.transform is None:
+            self.transform = transforms.Compose([
+                transforms.ToTensor(),
+            ])
 
         #Prendi i path delle immagini e delle labels
         BASE_DIR = Path.cwd().parent
@@ -35,7 +39,7 @@ class RDDdataset(torch.utils.data.Dataset):
         #Apri l'immagine
         img_name = self.images[index]
         img_path = os.path.join(self.train_images_path, img_name)
-        img = Image.open(img_path).convert("RGB")
+        img = self.transform(Image.open(img_path).convert("RGB"))
 
         #Prendi il path della label
         label_name = img_name.replace(".jpg", ".xml")
