@@ -1,70 +1,59 @@
 import torch
+from torchvision import transforms
 import os
 from PIL import Image
 import torch.utils.data
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-class RDDdataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = root_dir
+class YOLO11dataset(torch.utils.data.Dataset):
+    def __init__(self, img_dir, label_dir, img_size, transform=None):
+        self.img_dir = img_dir
+        self.label_dir = label_dir
+        self.img_size = img_size
         self.transform = transform
-
-        #Prendi i path delle immagini e delle labels
-        BASE_DIR = Path.cwd().parent
-        data_dir = os.path.join(BASE_DIR, "data", "United_States")
-        train_data_dir = os.path.join(data_dir, "train")
-        self.train_images_path = os.path.join(train_data_dir, "images")
-        self.train_labels_path = os.path.join(train_data_dir, "annotations", "xmls")
+        if self.transform is None:
+            self.transform = transforms.Compose([
+                transforms.ToTensor()
+            ])
 
         #Lista delle immagini (strings)
-        self.images = [img for img in os.listdir(self.train_images_path) if img.endswith(".jpg")]
-
-        #Dizionario per codifica delle classi
-        self.class_to_idx = {
-            'D00': 0,  # Longitudinal Crack
-            'D10': 1,  # Transverse Crack
-            'D20': 2,  # Alligator Crack
-            'D40': 3   # Pothole
-        }
+        self.img_files = [f for f in os.listdir(img_dir) if f.endswith('.jpg')]
 
     def __len__(self):
-        return len(self.images)
+        return len(self.img_files)
     
-    def __getitem__(self, index):
+    def __getitem__(self, idx):
         #Apri l'immagine
-        img_name = self.images[index]
-        img_path = os.path.join(self.train_images_path, img_name)
-        img = Image.open(img_path).convert("RGB")
+        img_path = os.path.join(self.img_dir, self.img_files[idx])
+        image = Image.open(img_path).convert("RGB")
+        #Applica trasformazioni
+        if self.transform:
+            image = self.transform(image)
 
         #Prendi il path della label
-        label_name = img_name.replace(".jpg", ".xml")
-        label_path = os.path.join(self.train_labels_path, label_name)
-        tree = ET.parse(label_path)
-        root = tree.getroot()
-
+        label_path = os.path.join(self.label_dir, os.path.splitext(self.img_files[idx])[0] + '.txt')
+    
         #Estrai bbox e classe
         bboxes = []
-        classes = []
-        for object in root.findall("object"):
-            class_name = object.find("name").text
-            classes.append(self.class_to_idx[class_name])
+        if os.path.exists(label_path):
+            with open(label_path, 'r') as f:
+                #Leggi le annotazioni [class_id, x_c, y_c, w, h]
+                for line in f:
+                    parts = line.strip().split()
+                    class_id = int(parts[0])
+                    x_center = float(parts[1])
+                    y_center = float(parts[2])
+                    width = float(parts[3])
+                    height = float(parts[4])
 
-            bbox = object.find("bndbox")
-            xmin = int(bbox.find("xmin").text)
-            ymin = int(bbox.find("ymin").text)
-            xmax = int(bbox.find("xmax").text)
-            ymax = int(bbox.find("ymax").text)
-            bboxes.append([xmin, ymin, xmax, ymax])
+                    # Converti l'annotazione al formato (x_min, y_min, x_max, y_max)
+                    x_min = (x_center - width / 2) * self.img_size
+                    y_min = (y_center - height / 2) * self.img_size
+                    x_max = (x_center + width / 2) * self.img_size
+                    y_max = (y_center + height / 2) * self.img_size
 
-        #Converti in tensori
-        bboxes = torch.as_tensor(bboxes, dtype=torch.float32)
-        classes = torch.as_tensor(classes, dtype=torch.int64)
+                    bboxes.append([class_id, x_min, y_min, x_max, y_max])
 
-        #Crea il dizionario delle labels
-        target = {
-            "boxes": bboxes,
-            "labels": classes
-        }
-
-        return img, target
+        bboxes = torch.tensor(bboxes, dtype=torch.float32)
+        return image, bboxes
