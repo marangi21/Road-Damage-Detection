@@ -1,13 +1,16 @@
+import os
 import torch
 import torch.utils
 import torch.utils.data
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from pascal import annotation_from_xml
 
-def custom_collate_fn(batch):
+def custom_pascalVOC_collate_fn(batch):
     """
-    Custom collate function per permettere al dataloader di ricevere immagini con diverso numero di bboxes
-    
+    Custom collate function per permettere al dataloader di ricevere immagini con diverso numero di bboxes (Pascal_VOC labels)
+    Ritorna una immagine e una lista di bounding boxes
+
     """
     images = []
     targets = []
@@ -17,15 +20,46 @@ def custom_collate_fn(batch):
         targets.append(sample[1])
     
     images = torch.stack(images, 0)
-    
-    # Non stacko le labels perché non sono tutte della stessa dimensione (diverso numero di bboxes per ogni immagine)
-    # Ritorno una lista di labels invece
-    
     return images, targets
 
+##########################################################################################################################################################
 
+def pascalVOC_to_YOLO(input_dir, output_dir) -> None:
+    """
+    Converte i files .xml con annotazioni pascalVOC in file .txt con annotazioni YOLO
 
-def visualize_batch(dataloader, num_images):
+    """
+
+    # Mappatura delle classi
+    label_map = {
+        'D00': 0,  # Longitudinal Crack
+        'D10': 1,  # Transverse Crack
+        'D20': 2,  # Alligator Crack
+        'D40': 3   # Pothole
+    }
+
+    # Assicurati che la cartella di output esista
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Funzione per convertire e salvare ogni file XML
+    for xml_file in os.listdir(input_dir):
+        if xml_file.endswith('.xml'):
+            ann_file = os.path.join(input_dir, xml_file)
+
+            # Legge il file XML
+            ann = annotation_from_xml(ann_file)
+
+            # Converte in formato YOLO
+            yolo_ann = ann.to_yolo(label_map)
+
+            # Salva il file nel formato YOLO con lo stesso nome dell'immagine
+            output_path = os.path.join(output_dir, os.path.splitext(xml_file)[0] + '.txt')
+            with open(output_path, 'w') as f:
+                f.write(yolo_ann)
+
+##########################################################################################################################################################
+
+def visualize_batch(dataloader, num_images) -> None:
     """
     Visualizzazione di un batch di immagini con relative bboxes per 
     verificare la correttezza del processo di data loading
@@ -48,9 +82,9 @@ def visualize_batch(dataloader, num_images):
         plt.axis('off')
         plt.show()
 
+##########################################################################################################################################################
 
-
-def plot_img_bbox(train_images, train_labels, idx):
+def plot_img_bbox(train_images, train_labels, idx) -> None:
     """
     Plot di immagini di training e relative bounding boxes per 
     verificare la correttezza delle annotazioni
