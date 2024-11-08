@@ -33,7 +33,9 @@ def pascalVOC_to_YOLO(input_dir, output_dir) -> None:
     # Mappatura delle classi
     label_map = {
         'D00': 0,  # Longitudinal Crack
+        'D01': 0,  # Longitudinal Crack
         'D10': 1,  # Transverse Crack
+        'D11': 1,  # Transverse Crack
         'D20': 2,  # Alligator Crack
         'D40': 3   # Pothole
     }
@@ -56,6 +58,22 @@ def pascalVOC_to_YOLO(input_dir, output_dir) -> None:
             output_path = os.path.join(output_dir, os.path.splitext(xml_file)[0] + '.txt')
             with open(output_path, 'w') as f:
                 f.write(yolo_ann)
+
+##########################################################################################################################################################
+
+def save_sorted_folder_structure(root_dir, output_file='folder_structure.txt'):
+    '''
+    Stampa la folder structure dalla cartella root_dir in giù in un file di testo
+    Non include i nomi dei files, solo le cartelle
+    
+    '''
+    with open(output_file, 'w') as f:
+        for dirpath, dirnames, _ in os.walk(root_dir):
+            # Ordina le directory in ordine alfabetico
+            dirnames.sort()
+            level = dirpath.replace(root_dir, '').count(os.sep)
+            indent = ' ' * 4 * level
+            f.write(f"{indent}{os.path.basename(dirpath)}/\n")
 
 ##########################################################################################################################################################
 
