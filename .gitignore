@@ -5,6 +5,8 @@ env/
 .venv/
 data/
 runs/
+A1.4_RDD_dataset/
+Jap_only/
 
 
 # Python
